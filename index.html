@@ -12,6 +12,9 @@
         background-color: #f0e4d4;
         touch-action: manipulation;
         -webkit-tap-highlight-color: transparent;
+        overscroll-behavior: none;
+        user-select: none;
+        -webkit-user-select: none;
       }
       .wood-texture {
         background-color: #e6b380;
@@ -27,7 +30,7 @@
       .animate-abyss {
         animation: fallToAbyss 0.6s cubic-bezier(0.55, 0.055, 0.675, 0.19) forwards;
         pointer-events: none;
-        z-index: 5;
+        /* z-index removed to allow React component utility classes to control stacking */
       }
 
       /* Flip Animation - 0.8s */
