@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Gemini Banqi</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -10,6 +10,8 @@
       body {
         font-family: 'Noto Serif TC', serif;
         background-color: #f0e4d4;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
       }
       .wood-texture {
         background-color: #e6b380;
@@ -25,7 +27,7 @@
       .animate-abyss {
         animation: fallToAbyss 0.6s cubic-bezier(0.55, 0.055, 0.675, 0.19) forwards;
         pointer-events: none;
-        z-index: 50;
+        z-index: 5;
       }
 
       /* Flip Animation - 0.8s */
@@ -156,9 +158,11 @@
   <script type="importmap">
 {
   "imports": {
-    "react/": "https://esm.sh/react@^19.2.3/",
     "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react-dom": "https://esm.sh/react-dom@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react-dom/client": "https://esm.sh/react-dom@^19.2.3/client"
   }
 }
 </script>

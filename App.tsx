@@ -6,7 +6,8 @@ import { Piece, Move, PlayerColor, Position } from './types';
 import { isValidMove, checkHasValidMoves } from './utils/gameLogic';
 
 const App: React.FC = () => {
-  const [pieces, setPieces] = useState<Piece[]>(generateNewGamePieces());
+  // Use lazy initialization for state to prevent unnecessary regeneration on re-renders
+  const [pieces, setPieces] = useState<Piece[]>(generateNewGamePieces);
   const [currentPlayerIndex, setCurrentPlayerIndex] = useState<number>(0); // 0 or 1
   const [playerColors, setPlayerColors] = useState<{ [key: number]: PlayerColor | null }>({ 0: null, 1: null });
   const [selectedPieceId, setSelectedPieceId] = useState<string | null>(null);

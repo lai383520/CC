@@ -69,7 +69,7 @@ const Board: React.FC<BoardProps> = ({ pieces, selectedPieceId, lastMove, onSqua
                                                 : 'bg-[#f4e4d4] border-2 border-black text-black'
                                         }
                                         ${isSelected && !piece.dying ? 'ring-4 ring-blue-400 scale-105 z-20' : ''}
-                                        ${piece.dying ? 'z-10' : 'z-10'}
+                                        ${piece.dying ? 'z-0' : 'z-10'}
                                     `}
                                 >
                                     {!piece.revealed ? (
