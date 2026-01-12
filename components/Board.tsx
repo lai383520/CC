@@ -60,8 +60,8 @@ const Board: React.FC<BoardProps> = ({ pieces, selectedPieceId, lastMove, onSqua
                                         w-[85%] h-[85%] rounded-full shadow-lg
                                         flex items-center justify-center select-none
                                         transition-all duration-300
-                                        ${piece.revealed ? 'animate-flip' : ''}
-                                        ${piece.dying ? 'animate-abyss' : ''} 
+                                        ${piece.revealed && !piece.dying ? 'animate-flip' : ''}
+                                        ${piece.dying ? 'animate-shatter' : ''} 
                                         ${!piece.revealed 
                                             ? 'bg-gradient-to-br from-[#5d4037] to-[#3e2723] border-2 border-[#8d6e63]' 
                                             : piece.color === 'red'

@@ -4,16 +4,24 @@ import KillScreen from './components/KillScreen';
 import { generateNewGamePieces, PIECE_CHARS } from './constants';
 import { Piece, Move, PlayerColor, Position } from './types';
 import { isValidMove, checkHasValidMoves } from './utils/gameLogic';
+import { soundManager } from './utils/soundManager';
 
 const App: React.FC = () => {
-  // Use lazy initialization for state to prevent unnecessary regeneration on re-renders
+  // Game Setup State
+  const [gameStarted, setGameStarted] = useState(false);
+  const [p1Name, setP1Name] = useState("玩家 1");
+  const [p2Name, setP2Name] = useState("玩家 2");
+
+  // Game Play State
   const [pieces, setPieces] = useState<Piece[]>(generateNewGamePieces);
   const [currentPlayerIndex, setCurrentPlayerIndex] = useState<number>(0); // 0 or 1
   const [playerColors, setPlayerColors] = useState<{ [key: number]: PlayerColor | null }>({ 0: null, 1: null });
   const [selectedPieceId, setSelectedPieceId] = useState<string | null>(null);
   const [lastMove, setLastMove] = useState<Move | null>(null);
   const [winner, setWinner] = useState<number | null>(null);
-  const [logs, setLogs] = useState<string[]>(["Game Start: Player 1's turn to flip."]);
+  const [logs, setLogs] = useState<string[]>([]);
+  const [isMuted, setIsMuted] = useState(false);
+  const [bgmVolume, setBgmVolume] = useState(0.3); // Initial matches SoundManager default
   
   // State for the Kill Screen Animation
   const [killAnimData, setKillAnimData] = useState<{ attacker: Piece, victim: Piece } | null>(null);
@@ -21,6 +29,60 @@ const App: React.FC = () => {
   const addLog = (msg: string) => setLogs(prev => [msg, ...prev].slice(0, 50));
 
   const getCurrentPlayerColor = () => playerColors[currentPlayerIndex];
+  const getCurrentPlayerName = () => currentPlayerIndex === 0 ? p1Name : p2Name;
+  const getPlayerName = (idx: number) => idx === 0 ? p1Name : p2Name;
+
+  // Initialize Audio Context on first interaction
+  useEffect(() => {
+    const initAudio = () => {
+        soundManager.init();
+        window.removeEventListener('click', initAudio);
+        window.removeEventListener('touchstart', initAudio);
+    };
+    window.addEventListener('click', initAudio);
+    window.addEventListener('touchstart', initAudio);
+    return () => {
+        window.removeEventListener('click', initAudio);
+        window.removeEventListener('touchstart', initAudio);
+        soundManager.stopBGM(); // Ensure clean state on unmount
+    };
+  }, []);
+
+  // Handle BGM when game state changes
+  useEffect(() => {
+    if (gameStarted && winner === null) {
+        soundManager.startBGM();
+    } else {
+        soundManager.stopBGM();
+    }
+  }, [gameStarted, winner]);
+
+  const startGame = () => {
+    if (!p1Name.trim()) setP1Name("玩家 1");
+    if (!p2Name.trim()) setP2Name("玩家 2");
+    soundManager.playSelect();
+    setGameStarted(true);
+    setLogs([`遊戲開始：${p1Name} 請翻牌`]);
+    // BGM starts via useEffect
+  };
+
+  const toggleMute = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      const muted = soundManager.toggleMute();
+      setIsMuted(muted);
+      if (muted) {
+          soundManager.stopBGM();
+      } else if (gameStarted && winner === null) {
+          soundManager.startBGM();
+      }
+  };
+
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      e.stopPropagation(); // Prevent clicks from bubbling if needed
+      const vol = parseFloat(e.target.value);
+      setBgmVolume(vol);
+      soundManager.setBGMVolume(vol);
+  };
 
   // Effect to check stalemate AFTER turn update or piece update
   useEffect(() => {
@@ -33,7 +95,8 @@ const App: React.FC = () => {
           if (!hasMoves) {
               const opponentIndex = currentPlayerIndex === 0 ? 1 : 0;
               setWinner(opponentIndex);
-              addLog(`Game Over: Player ${currentPlayerIndex + 1} has no moves! Player ${opponentIndex + 1} Wins!`);
+              soundManager.playKO(); // This stops BGM inside the method
+              addLog(`遊戲結束：${getPlayerName(currentPlayerIndex)} 無子可動！${getPlayerName(opponentIndex)} 獲勝！`);
           }
       }
   }, [currentPlayerIndex, pieces, playerColors, winner, killAnimData]);
@@ -56,6 +119,7 @@ const App: React.FC = () => {
     // Case 2: Clicked a revealed piece
     if (clickedPiece && clickedPiece.revealed) {
       if (myColor && clickedPiece.color === myColor) {
+        soundManager.playSelect();
         setSelectedPieceId(clickedPiece.id);
         return;
       }
@@ -75,11 +139,15 @@ const App: React.FC = () => {
   };
 
   const handleFlip = (piece: Piece) => {
+    soundManager.playFlip();
+
     // 1. Reveal piece
     const newPieces = pieces.map(p => p.id === piece.id ? { ...p, revealed: true } : p);
     setPieces(newPieces);
     
-    let logMsg = `Player ${currentPlayerIndex + 1} flipped ${piece.color} ${piece.type}`;
+    const char = PIECE_CHARS[`${piece.color}_${piece.type}`];
+    const colorName = piece.color === 'red' ? '紅' : '黑';
+    let logMsg = `${getCurrentPlayerName()} 翻出 ${colorName}${char}`;
 
     // 2. Assign colors if not yet assigned
     let newColors = { ...playerColors };
@@ -88,7 +156,7 @@ const App: React.FC = () => {
       const p2Color = piece.color === 'red' ? 'black' : 'red';
       newColors = { 0: p1Color, 1: p2Color };
       setPlayerColors(newColors);
-      logMsg += `. P1 is ${p1Color.toUpperCase()}.`;
+      logMsg += ` (${p1Name} 執${p1Color === 'red' ? '紅' : '黑'})`;
     }
 
     addLog(logMsg);
@@ -102,6 +170,9 @@ const App: React.FC = () => {
     
     // If it's a capture, trigger the Kill Screen Animation FIRST
     if (targetPiece) {
+        const isUnderdog = piece.type === 'soldier' && targetPiece.type === 'general';
+        soundManager.playKill(piece.type, isUnderdog);
+
         setKillAnimData({ attacker: piece, victim: targetPiece });
         
         // Wait for animation duration (1.8s) before updating the board
@@ -111,6 +182,7 @@ const App: React.FC = () => {
         }, 1800);
     } else {
         // Normal move
+        soundManager.playMove();
         performBoardUpdate(piece, to, null);
     }
   };
@@ -132,9 +204,17 @@ const App: React.FC = () => {
     setLastMove({ from: piece.position, to });
     setSelectedPieceId(null);
     
-    const moveLog = `${piece.type} -> (${to.r},${to.c})`;
-    const captureLog = targetPiece ? ` captures ${targetPiece.type}` : '';
-    addLog(`Player ${currentPlayerIndex + 1} (${playerColors[currentPlayerIndex]}): ${moveLog}${captureLog}`);
+    const attackerChar = PIECE_CHARS[`${piece.color}_${piece.type}`];
+    let actionStr = "";
+    if (targetPiece) {
+        const targetChar = PIECE_CHARS[`${targetPiece.color}_${targetPiece.type}`];
+        actionStr = `吃 ${targetChar}`;
+    } else {
+        actionStr = `→ (${to.r},${to.c})`;
+    }
+    
+    const playerLabel = playerColors[currentPlayerIndex] === 'red' ? '紅方' : '黑方';
+    addLog(`${getCurrentPlayerName()} (${playerLabel}): ${attackerChar} ${actionStr}`);
 
     // Clean up dead piece after abyss animation
     if (targetPiece) {
@@ -152,7 +232,8 @@ const App: React.FC = () => {
         const opponentAlive = newPieces.filter(p => p.color === opponentColor && !p.dead && !p.dying);
         if (opponentAlive.length === 0) {
             setWinner(currentPlayerIndex);
-            addLog(`GAME OVER! Player ${currentPlayerIndex + 1} Wins (Elimination)!`);
+            soundManager.playKO();
+            addLog(`遊戲結束！${getPlayerName(currentPlayerIndex)} 獲勝！`);
             return; 
         }
     }
@@ -164,10 +245,15 @@ const App: React.FC = () => {
     if (winner !== null) return;
     const opponentIndex = currentPlayerIndex === 0 ? 1 : 0;
     setWinner(opponentIndex);
-    addLog(`Player ${currentPlayerIndex + 1} Surrendered. Player ${opponentIndex + 1} Wins!`);
+    soundManager.playKO();
+    addLog(`${getPlayerName(currentPlayerIndex)} 投降。${getPlayerName(opponentIndex)} 獲勝！`);
   };
 
-  const resetGame = () => {
+  const resetGame = (restartBGM: any = true) => {
+      const shouldRestartBGM = typeof restartBGM === 'boolean' ? restartBGM : true;
+
+      soundManager.stopBGM(); // Explicitly stop BGM on reset
+      soundManager.playSelect();
       setPieces(generateNewGamePieces());
       setCurrentPlayerIndex(0);
       setPlayerColors({ 0: null, 1: null });
@@ -175,7 +261,15 @@ const App: React.FC = () => {
       setLastMove(null);
       setWinner(null);
       setKillAnimData(null);
-      setLogs(["Game Restarted: Player 1 to flip."]);
+      setLogs([`遊戲開始：${p1Name} 請翻牌`]);
+      if (shouldRestartBGM && gameStarted) {
+         soundManager.startBGM();
+      }
+  };
+  
+  const backToSetup = () => {
+      setGameStarted(false);
+      resetGame(false); // Do not restart BGM as we are leaving the game view
   };
 
   // Helper to render graveyard pieces
@@ -183,7 +277,7 @@ const App: React.FC = () => {
     const deadPieces = pieces.filter(p => p.dead && p.color === color).sort((a, b) => b.rank - a.rank);
     return (
       <div className="flex flex-wrap gap-1 bg-black/10 p-2 rounded-lg min-h-[3rem] items-center">
-        {deadPieces.length === 0 && <span className="text-xs text-gray-500 italic px-2">No casualties</span>}
+        {deadPieces.length === 0 && <span className="text-xs text-gray-500 italic px-2">無傷亡</span>}
         {deadPieces.map(p => (
            <div key={p.id} className={`
               w-8 h-8 rounded-full border border-opacity-50 flex items-center justify-center text-sm shadow-sm opacity-70 grayscale hover:grayscale-0 transition-all
@@ -196,12 +290,108 @@ const App: React.FC = () => {
     );
   };
 
+  if (!gameStarted) {
+      return (
+          <div className="min-h-screen bg-[#f0e4d4] flex flex-col items-center justify-center p-4 font-serif relative overflow-hidden">
+               {/* Background effect */}
+               <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/wood-pattern.png')] opacity-50 pointer-events-none"></div>
+               
+               <div className="z-10 bg-white/90 p-8 rounded-2xl shadow-2xl border-4 border-[#8d6e63] w-full max-w-md text-center">
+                   <h1 className="text-5xl font-black text-[#3e2723] mb-2 tracking-widest">暗棋大戰</h1>
+                   <p className="text-[#5d4037] mb-8 font-bold text-lg">BANQI BATTLE</p>
+                   
+                   <div className="space-y-6">
+                       <div className="text-left">
+                           <label className="block text-sm font-bold text-[#8d6e63] mb-1 pl-1">玩家 1 名稱</label>
+                           <input 
+                              type="text" 
+                              value={p1Name} 
+                              onChange={(e) => setP1Name(e.target.value)}
+                              className="w-full text-lg p-3 rounded border-2 border-[#d7ccc8] focus:border-amber-600 focus:outline-none bg-[#fff8e1] text-[#3e2723] font-bold"
+                              placeholder="輸入名稱..."
+                           />
+                       </div>
+                       
+                       <div className="flex items-center justify-center text-3xl font-black text-amber-800/50">
+                            VS
+                       </div>
+
+                       <div className="text-left">
+                           <label className="block text-sm font-bold text-[#8d6e63] mb-1 pl-1">玩家 2 名稱</label>
+                           <input 
+                              type="text" 
+                              value={p2Name} 
+                              onChange={(e) => setP2Name(e.target.value)}
+                              className="w-full text-lg p-3 rounded border-2 border-[#d7ccc8] focus:border-amber-600 focus:outline-none bg-[#fff8e1] text-[#3e2723] font-bold"
+                              placeholder="輸入名稱..."
+                           />
+                       </div>
+
+                       <button 
+                         onClick={startGame}
+                         className="w-full bg-amber-700 text-white text-xl py-4 rounded-xl shadow-lg hover:bg-amber-800 hover:scale-105 transition-all font-bold border-b-4 border-amber-900 active:border-b-0 active:translate-y-1 mt-4"
+                       >
+                           開始對戰
+                       </button>
+                   </div>
+               </div>
+          </div>
+      );
+  }
+
   return (
     <div className="min-h-screen bg-[#f0e4d4] flex flex-col items-center justify-center p-4 font-serif text-[#3e2723]">
       
+      {/* Sound Toggle (Floating Top Right) */}
+      <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
+          {/* BGM Volume Slider */}
+          <div className="hidden md:flex items-center gap-2 bg-white/80 p-2 rounded-full shadow-lg border border-[#8d6e63]">
+            <span className="text-xs font-bold text-amber-900">♫</span>
+            <input 
+              type="range" 
+              min="0" 
+              max="1" 
+              step="0.05" 
+              value={bgmVolume} 
+              onChange={handleVolumeChange} 
+              className="w-20 accent-amber-700 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+            />
+          </div>
+
+          <button 
+            onClick={backToSetup}
+            className="bg-white/80 p-2 rounded-full shadow-lg border border-[#8d6e63] hover:bg-white transition-all text-xs font-bold px-3"
+            title="Return to Setup"
+          >
+            退出
+          </button>
+          <button 
+            onClick={toggleMute}
+            className="bg-white/80 p-2 rounded-full shadow-lg border border-[#8d6e63] hover:bg-white transition-all active:scale-95 w-10 h-10 flex items-center justify-center"
+          >
+            {isMuted ? '🔇' : '🔊'}
+          </button>
+      </div>
+
       {/* Full Screen Kill Animation Overlay */}
       {killAnimData && (
         <KillScreen attacker={killAnimData.attacker} victim={killAnimData.victim} />
+      )}
+
+      {/* KO Screen Overlay */}
+      {winner !== null && (
+         <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center animate-ko-bg overflow-hidden cursor-pointer" onClick={backToSetup}>
+            <div className="relative flex items-center justify-center gap-2 md:gap-8">
+               <span className="text-[12rem] md:text-[20rem] font-black text-red-600 animate-ko-text drop-shadow-[0_0_50px_rgba(255,0,0,0.8)]" style={{ fontFamily: "'Black Ops One', cursive" }}>K</span>
+               <span className="text-[12rem] md:text-[20rem] font-black text-red-600 animate-ko-text drop-shadow-[0_0_50px_rgba(255,0,0,0.8)]" style={{ animationDelay: '0.1s', fontFamily: "'Black Ops One', cursive" }}>O</span>
+            </div>
+            
+            <div className="absolute bottom-20 text-white text-3xl md:text-5xl font-bold tracking-widest animate-pulse uppercase">
+               {getPlayerName(winner)} 獲勝
+            </div>
+
+            <div className="absolute top-1/2 left-0 w-full h-32 bg-white/10 blur-xl animate-pulse"></div>
+         </div>
       )}
 
       <div className="w-full max-w-4xl flex flex-col md:flex-row gap-8 items-start justify-center">
@@ -211,9 +401,9 @@ const App: React.FC = () => {
             {/* Header / HUD */}
             <div className="w-full flex justify-between items-center mb-4 bg-white/60 p-4 rounded-lg shadow">
                 <div className={`flex flex-col items-center p-2 rounded w-32 transition-all ${currentPlayerIndex === 0 ? 'bg-amber-200 ring-4 ring-amber-600 scale-105' : 'opacity-70'}`}>
-                    <span className="font-bold text-lg">Player 1</span>
+                    <span className="font-bold text-lg truncate w-full text-center">{p1Name}</span>
                     <span className="text-sm uppercase font-bold text-gray-600">
-                        {playerColors[0] ? playerColors[0] : '?'}
+                        {playerColors[0] ? (playerColors[0] === 'red' ? '紅方' : '黑方') : '?'}
                     </span>
                 </div>
 
@@ -222,9 +412,9 @@ const App: React.FC = () => {
                 </div>
 
                 <div className={`flex flex-col items-center p-2 rounded w-32 transition-all ${currentPlayerIndex === 1 ? 'bg-amber-200 ring-4 ring-amber-600 scale-105' : 'opacity-70'}`}>
-                    <span className="font-bold text-lg">Player 2</span>
+                    <span className="font-bold text-lg truncate w-full text-center">{p2Name}</span>
                     <span className="text-sm uppercase font-bold text-gray-600">
-                        {playerColors[1] ? playerColors[1] : '?'}
+                        {playerColors[1] ? (playerColors[1] === 'red' ? '紅方' : '黑方') : '?'}
                     </span>
                 </div>
             </div>
@@ -240,34 +430,28 @@ const App: React.FC = () => {
             {/* Graveyard Section */}
             <div className="w-full mt-4 grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1">
-                   <span className="text-xs font-bold text-red-800 uppercase">Red Lost</span>
+                   <span className="text-xs font-bold text-red-800 uppercase">紅方陣亡</span>
                    {renderGraveyard('red')}
                 </div>
                 <div className="flex flex-col gap-1">
-                   <span className="text-xs font-bold text-black uppercase">Black Lost</span>
+                   <span className="text-xs font-bold text-black uppercase">黑方陣亡</span>
                    {renderGraveyard('black')}
                 </div>
             </div>
-
-            {winner !== null && (
-                <div className="mt-6 p-6 bg-yellow-400 text-yellow-900 rounded-xl text-3xl font-bold animate-bounce shadow-2xl border-4 border-yellow-600 z-50">
-                    🏆 PLAYER {winner + 1} WINS! 🏆
-                </div>
-            )}
         </div>
 
         {/* Sidebar */}
         <div className="w-full md:w-72 flex flex-col gap-4">
             <div className="bg-white/80 p-4 rounded-lg shadow-lg h-96 overflow-hidden flex flex-col border border-[#d7ccc8]">
                 <h3 className="text-amber-900 font-bold border-b-2 border-amber-200 pb-2 mb-2 flex justify-between">
-                    <span>Game Logs</span>
-                    <span className="text-xs font-normal pt-1 opacity-50">Latest first</span>
+                    <span>戰報</span>
+                    <span className="text-xs font-normal pt-1 opacity-50">最新</span>
                 </h3>
-                <div className="flex-1 overflow-y-auto text-xs font-mono space-y-2 pr-1 custom-scrollbar">
+                <div className="flex-1 overflow-y-auto text-base font-bold font-serif space-y-2 pr-1 custom-scrollbar">
                     {logs.map((l, i) => (
-                        <div key={i} className="text-gray-800 bg-amber-50/50 p-1 rounded">
-                            <span className="text-amber-700 font-bold mr-2">#{logs.length - i}</span>
-                            {l}
+                        <div key={i} className="text-[#3e2723] bg-amber-50/50 p-2 rounded border-b border-amber-100 flex items-start">
+                            <span className="text-amber-600 text-xs mr-2 mt-1">#{logs.length - i}</span>
+                            <span className="break-all">{l}</span>
                         </div>
                     ))}
                 </div>
@@ -275,30 +459,29 @@ const App: React.FC = () => {
 
             <div className="flex flex-col gap-2">
                 <button 
-                    onClick={resetGame}
+                    onClick={() => resetGame(true)}
                     className="w-full bg-amber-800 text-white py-3 rounded-lg shadow-lg hover:bg-amber-900 transition-all font-bold text-lg border-b-4 border-amber-950 active:border-b-0 active:translate-y-1 active:shadow-inner"
                 >
-                    New Game
+                    重新開始
                 </button>
                 <button 
                     onClick={handleSurrender}
                     disabled={winner !== null}
                     className="w-full bg-red-100 text-red-900 py-3 rounded-lg shadow hover:bg-red-200 transition-all font-bold border-2 border-red-300 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    Surrender
+                    投降
                 </button>
             </div>
             
             <div className="bg-[#fff8e1] p-4 rounded-lg text-xs text-amber-900 border border-amber-200 shadow-sm">
-                <p className="font-bold mb-2 text-base border-b border-amber-200 pb-1">Rules</p>
+                <p className="font-bold mb-2 text-base border-b border-amber-200 pb-1">遊戲規則</p>
                 <ul className="list-disc pl-4 space-y-1 leading-relaxed">
-                    <li>Flip any hidden piece on your turn.</li>
-                    <li>First flip decides your color.</li>
-                    <li>Move 1 step orthogonally.</li>
-                    <li>Capture by rank: King > Adv > Ele > Rook > Horse > Pawn.</li>
-                    <li><strong>Exception:</strong> Pawn captures King.</li>
-                    <li><strong>Cannon:</strong> Jumps exactly 1 piece to capture.</li>
-                    <li><strong>Lose Condition:</strong> No pieces left, No moves, or Surrender.</li>
+                    <li>輪流翻牌，首翻定色。</li>
+                    <li>每次移動一格（上下左右）。</li>
+                    <li>大小：將 > 士 > 象 > 車 > 馬 > 卒。</li>
+                    <li><strong>例外：</strong> 卒 吃 將。</li>
+                    <li><strong>炮：</strong> 必須隔一子吃子。</li>
+                    <li><strong>獲勝：</strong> 吃光對方或對方無路可走。</li>
                 </ul>
             </div>
         </div>

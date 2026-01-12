@@ -7,6 +7,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700;900&display=swap');
+      @import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&display=swap'); /* For KO Text */
+
       body {
         font-family: 'Noto Serif TC', serif;
         background-color: #f0e4d4;
@@ -21,16 +23,17 @@
         background-image: url("https://www.transparenttextures.com/patterns/wood-pattern.png");
       }
       
-      /* Abyss / Dying Animation */
-      @keyframes fallToAbyss {
-        0% { transform: scale(1) rotate(0deg); opacity: 1; filter: brightness(1); }
-        30% { transform: scale(0.8) rotate(20deg); opacity: 1; filter: brightness(0.8); }
-        100% { transform: scale(0) rotate(720deg); opacity: 0; filter: brightness(0); }
+      /* DESTRUCTION / SHATTER Animation */
+      @keyframes shatter {
+        0% { transform: scale(1) rotate(0deg); filter: brightness(1) grayscale(0); opacity: 1; }
+        10% { transform: scale(1.1) rotate(5deg); filter: brightness(5) grayscale(1); opacity: 1; } /* Flash White */
+        30% { transform: scale(1.2) rotate(-5deg); filter: brightness(2) blur(2px); opacity: 0.8; }
+        100% { transform: scale(1.5) rotate(15deg); filter: blur(10px) opacity(0); opacity: 0; } /* Dissolve */
       }
-      .animate-abyss {
-        animation: fallToAbyss 0.6s cubic-bezier(0.55, 0.055, 0.675, 0.19) forwards;
+      .animate-shatter {
+        animation: shatter 0.5s cubic-bezier(0.19, 1, 0.22, 1) forwards;
         pointer-events: none;
-        /* z-index removed to allow React component utility classes to control stacking */
+        z-index: 50 !important; /* Ensure it stays on top while exploding */
       }
 
       /* Flip Animation - 0.8s */
@@ -44,18 +47,13 @@
       }
 
       /* --- KILL SCREEN ANIMATIONS --- */
-
-      /* General: Slam Text */
       @keyframes slam {
         0% { transform: scale(3); opacity: 0; letter-spacing: 20px; }
         50% { opacity: 1; }
         100% { transform: scale(1); opacity: 1; letter-spacing: 0px; }
       }
-      .animate-slam {
-        animation: slam 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-      }
+      .animate-slam { animation: slam 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
 
-      /* General: Heavy Shake */
       @keyframes heavy-shake {
         0%, 100% { transform: translate(0, 0); }
         10% { transform: translate(-10px, -10px); }
@@ -64,34 +62,28 @@
         40% { transform: translate(10px, -10px); }
         50% { transform: translate(0, 0); }
       }
-      .animate-heavy-shake {
-        animation: heavy-shake 0.5s ease-out;
-      }
+      .animate-heavy-shake { animation: heavy-shake 0.5s ease-out; }
 
-      /* Soldier: Sharp Thrust / Jab */
-      @keyframes sharp-thrust {
-        0% { transform: translate(0, 0) scale(1); opacity: 0; }
-        30% { transform: translate(-30px, 30px) scale(0.8); opacity: 1; } /* Wind up */
-        40% { transform: translate(100px, -100px) scale(1.5); opacity: 1; } /* Strike */
-        100% { transform: translate(120px, -120px) scale(1.5); opacity: 0; }
+      /* Fixed Soldier Animation: Contained Rapid Rush instead of flying off screen */
+      @keyframes rapid-thrust {
+        0% { transform: translateX(0) skewX(0); opacity: 0; }
+        20% { transform: translateX(-20px) skewX(-20deg); opacity: 1; }
+        40% { transform: translateX(20px) skewX(20deg); }
+        60% { transform: translateX(-10px) skewX(-10deg); }
+        80% { transform: translateX(10px) skewX(10deg); }
+        100% { transform: translateX(0) skewX(0); opacity: 1; }
       }
-      .animate-thrust {
-        animation: sharp-thrust 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-      }
+      .animate-thrust { animation: rapid-thrust 0.4s ease-out forwards; }
 
-      /* Horse: Jump and Trample */
       @keyframes hoof-trample {
         0% { transform: scale(1) translateY(0); }
-        40% { transform: scale(1.5) translateY(-50px) rotate(-10deg); } /* Jump high */
-        60% { transform: scale(1.5) translateY(-50px) rotate(-10deg); } /* Hang time */
-        80% { transform: scale(0.9) translateY(20px) rotate(0deg); } /* Impact */
+        40% { transform: scale(1.5) translateY(-50px) rotate(-10deg); }
+        60% { transform: scale(1.5) translateY(-50px) rotate(-10deg); }
+        80% { transform: scale(0.9) translateY(20px) rotate(0deg); }
         100% { transform: scale(1) translateY(0); }
       }
-      .animate-trample {
-        animation: hoof-trample 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards;
-      }
+      .animate-trample { animation: hoof-trample 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards; }
 
-      /* Advisor: Cross Slash (X shape) */
       @keyframes slash-left {
         0% { clip-path: polygon(0 0, 0 0, 0 0, 0 0); opacity: 0; }
         20% { clip-path: polygon(0 0, 100% 100%, 100% 100%, 0 0); opacity: 1; }
@@ -105,47 +97,34 @@
       .animate-slash-l { animation: slash-left 0.4s ease-out forwards; }
       .animate-slash-r { animation: slash-right 0.4s ease-out forwards; }
 
-      /* Cannon: Explosion Shockwave */
       @keyframes radial-blast {
         0% { width: 0; height: 0; opacity: 1; border-width: 100px; }
-        100% { width: 200vmax; height: 200vmax; opacity: 0; border-width: 0; }
+        100% { width: 150vmin; height: 150vmin; opacity: 0; border-width: 0; }
       }
-      .animate-blast {
-        animation: radial-blast 1.2s ease-out forwards;
-      }
+      .animate-blast { animation: radial-blast 0.8s ease-out forwards; }
 
-      /* Chariot: Fire Rush */
       @keyframes fire-rush {
         0% { transform: translateX(-150%) skewX(-30deg); opacity: 0; }
         20% { transform: translateX(0) skewX(-30deg); opacity: 1; }
         80% { transform: translateX(0) skewX(-30deg); opacity: 1; }
         100% { transform: translateX(150%) skewX(-30deg); opacity: 0; }
       }
-      .animate-fire-rush {
-        animation: fire-rush 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-      }
+      .animate-fire-rush { animation: fire-rush 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
 
-      /* King: Dragon Pulse */
       @keyframes dragon-pulse {
         0% { transform: scale(1); filter: brightness(1); }
         50% { transform: scale(1.1); filter: brightness(1.5) drop-shadow(0 0 20px gold); }
         100% { transform: scale(1); filter: brightness(1); }
       }
-      .animate-dragon {
-        animation: dragon-pulse 1.5s infinite ease-in-out;
-      }
+      .animate-dragon { animation: dragon-pulse 1.5s infinite ease-in-out; }
       
-      /* Flash for impact */
       @keyframes bgFlash {
         0% { background-color: rgba(0,0,0,0); }
         10% { background-color: rgba(255,255,255,0.9); }
         100% { background-color: rgba(0,0,0,0.85); }
       }
-      .animate-bg-flash {
-        animation: bgFlash 0.5s ease-out forwards;
-      }
+      .animate-bg-flash { animation: bgFlash 0.5s ease-out forwards; }
       
-      /* Glitch Text for Underdog */
       @keyframes glitch {
         0% { transform: translate(0); }
         20% { transform: translate(-2px, 2px); }
@@ -154,8 +133,28 @@
         80% { transform: translate(2px, -2px); }
         100% { transform: translate(0); }
       }
-      .animate-glitch {
-        animation: glitch 0.2s linear infinite;
+      .animate-glitch { animation: glitch 0.2s linear infinite; }
+
+      /* --- KO ANIMATION --- */
+      @keyframes ko-punch-zoom {
+        0% { transform: scale(10); opacity: 0; filter: blur(20px); }
+        50% { transform: scale(0.9); opacity: 1; filter: blur(0px); }
+        60% { transform: scale(1.1); }
+        70% { transform: scale(1); }
+        100% { transform: scale(1); }
+      }
+      .animate-ko-text {
+        animation: ko-punch-zoom 0.5s cubic-bezier(0.19, 1, 0.22, 1) forwards;
+      }
+      
+      @keyframes ko-bg-flash {
+        0% { background-color: #fff; }
+        10% { background-color: #f00; }
+        30% { background-color: #000; }
+        100% { background-color: rgba(0,0,0,0.95); }
+      }
+      .animate-ko-bg {
+        animation: ko-bg-flash 2s ease-out forwards;
       }
     </style>
   <script type="importmap">
