@@ -236,13 +236,47 @@ class SoundManager {
   playSelect() {
     this.playFM(880, 220, 500, 0.1, 0.2);
   }
+  
+  // Improved Flip Sound (Sharp clack)
   playFlip() {
-    this.playFM(600, 1200, 300, 0.3, 0.3, 'triangle'); // Mystery sound
+     if (!this.ctx || !this.sfxGain) return;
+     const t = this.ctx.currentTime;
+     
+     // High click/transient
+     const osc = this.ctx.createOscillator();
+     osc.frequency.setValueAtTime(2000, t);
+     osc.frequency.exponentialRampToValueAtTime(500, t + 0.05);
+     const oscGain = this.ctx.createGain();
+     oscGain.gain.setValueAtTime(0.3, t);
+     oscGain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+     osc.connect(oscGain);
+     oscGain.connect(this.sfxGain);
+     osc.start();
+     osc.stop(t + 0.05);
+     
+     // Texture (Wood Chip)
+     this.playNoise('highpass', 2000, 1, 0.1, 0.3);
   }
+
+  // Improved Move Sound (Solid Wood Thud)
   playMove() {
      if (!this.ctx || !this.sfxGain) return;
-     // Quick wood tap
-     this.playNoise('lowpass', 600, 1, 0.1, 0.3);
+     const t = this.ctx.currentTime;
+     
+     // 1. Impact "Thud" (Low Sine)
+     const osc = this.ctx.createOscillator();
+     osc.frequency.setValueAtTime(150, t);
+     osc.frequency.exponentialRampToValueAtTime(40, t + 0.1);
+     const oscGain = this.ctx.createGain();
+     oscGain.gain.setValueAtTime(0.5, t);
+     oscGain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+     osc.connect(oscGain);
+     oscGain.connect(this.sfxGain);
+     osc.start();
+     osc.stop(t + 0.1);
+
+     // 2. Wood Texture (Filtered Noise)
+     this.playNoise('bandpass', 1000, 2, 0.1, 0.4);
   }
 
   // --- 7 DISTINCT KILL SOUNDS (2 Seconds Duration) ---
@@ -449,12 +483,30 @@ class SoundManager {
     });
   }
 
+  // Improved KO Sound (Dramatic)
   playKO() {
     this.stopBGM();
     if (this.isMuted) return;
     this.init();
-    this.playNoise('lowpass', 50, 1, 3.0, 1.0);
-    this.playFM(50, 20, 500, 3.0, 1.0, 'sawtooth');
+    
+    const t = this.ctx!.currentTime;
+    
+    // Sub-bass impact
+    const sub = this.ctx!.createOscillator();
+    sub.frequency.setValueAtTime(100, t);
+    sub.frequency.exponentialRampToValueAtTime(10, t + 1.0);
+    const subGain = this.ctx!.createGain();
+    subGain.gain.setValueAtTime(1.0, t);
+    subGain.gain.exponentialRampToValueAtTime(0.01, t + 2.0);
+    sub.connect(subGain); subGain.connect(this.sfxGain!);
+    sub.start();
+    sub.stop(t+2.0);
+
+    // Noise Crash
+    this.playNoise('lowpass', 100, 1, 3.0, 1.0);
+    
+    // High Squelch
+    this.playFM(50, 20, 500, 3.0, 0.8, 'sawtooth');
   }
 }
 

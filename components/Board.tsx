@@ -64,6 +64,7 @@ const Board: React.FC<BoardProps> = ({ pieces, selectedPieceId, lastMove, onSqua
         <div className="absolute inset-0 pointer-events-none">
             {pieces.map(piece => {
                 const isSelected = selectedPieceId === piece.id;
+                const isLastMovedPiece = lastMove && lastMove.to.r === piece.position.r && lastMove.to.c === piece.position.c;
                 
                 // Keep dying pieces for the kill animation (controlled by 'dying' prop)
                 if (piece.dead) return null;
@@ -74,7 +75,7 @@ const Board: React.FC<BoardProps> = ({ pieces, selectedPieceId, lastMove, onSqua
                         className={`
                             absolute flex items-center justify-center
                             transition-all duration-500 cubic-bezier(0.34, 1.56, 0.64, 1)
-                            ${piece.dying ? 'z-50' : isSelected ? 'z-40' : 'z-10'}
+                            ${piece.dying ? 'z-50' : (isSelected || isLastMovedPiece) ? 'z-40' : 'z-10'}
                         `}
                         style={{
                             ...getPieceStyle(piece.position.r, piece.position.c),
