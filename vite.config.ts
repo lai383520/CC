@@ -1,4 +1,5 @@
-import { defineConfig, loadEnv } from 'vite'; // 不需要 import path
+import path from 'path';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
@@ -15,6 +16,7 @@ export default defineConfig(({ mode }) => {
       },
       resolve: {
         alias: {
+          '@': path.resolve(__dirname, '.'),
         }
       }
     };
